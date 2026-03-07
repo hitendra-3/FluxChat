@@ -31,12 +31,12 @@ const rooms = new Map();
 
 // Initialize default rooms
 const defaultRooms = [
-  { id: 'cse', name: 'cse', description: 'CSE Students Lounge', createdAt: Date.now(), members: new Set(), isDefault: true },
-  { id: 'tech', name: 'tech', description: 'Tech Talk & News', createdAt: Date.now(), members: new Set(), isDefault: true },
-  { id: 'coding', name: 'coding', description: 'Coding & Algorithms', createdAt: Date.now(), members: new Set(), isDefault: true },
-  { id: 'ai', name: 'ai', description: 'Artificial Intelligence', createdAt: Date.now(), members: new Set(), isDefault: true },
-  { id: 'webdev', name: 'webdev', description: 'Web Development', createdAt: Date.now(), members: new Set(), isDefault: true },
-  { id: 'placements', name: 'placements', description: 'Job Placements & Prep', createdAt: Date.now(), members: new Set(), isDefault: true }
+  { id: 'cse', name: 'cse', description: 'CSE Students Lounge', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true },
+  { id: 'tech', name: 'tech', description: 'Tech Talk & News', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true },
+  { id: 'coding', name: 'coding', description: 'Coding & Algorithms', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true },
+  { id: 'ai', name: 'ai', description: 'Artificial Intelligence', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true },
+  { id: 'webdev', name: 'webdev', description: 'Web Development', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true },
+  { id: 'placements', name: 'placements', description: 'Job Placements & Prep', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true }
 ];
 
 for (const room of defaultRooms) {

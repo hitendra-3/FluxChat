@@ -34,7 +34,7 @@ export function ChatLayout({
           >
             {leftOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <div className="text-sm font-semibold text-foreground">ChatHub</div>
+          <div className="text-sm font-semibold text-foreground">FluxChat</div>
           <button
             onClick={() => setRightOpen(!rightOpen)}
             className="p-2 hover:bg-muted rounded-md transition-colors"

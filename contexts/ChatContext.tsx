@@ -100,7 +100,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           memberCount: Array.isArray(members) ? members.length : room.memberCount || 1,
           unreadCount: 0,
           createdAt: new Date(room.createdAt || Date.now()),
-          isPublic: false,
+          isPublic: !!room.isPublic,
           code: room.code || roomId,
         };
         if (!exists) {

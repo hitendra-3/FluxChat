@@ -11,7 +11,7 @@ export function WelcomeScreen() {
       </div>
 
       <div>
-        <h2 className="text-3xl font-bold mb-2 text-foreground">Welcome to ChatHub</h2>
+        <h2 className="text-3xl font-bold mb-2 text-foreground">Welcome to FluxChat</h2>
         <p className="text-muted-foreground text-base max-w-md">
           Select a room from the left sidebar to start chatting with people around the world
         </p>

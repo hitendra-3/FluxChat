@@ -55,8 +55,8 @@ export function LoginScreen() {
                 <Users size={24} className="text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">FluxChat</h1>
-                <p className="text-xs text-muted-foreground">Connect with the world</p>
+                <h1 className="text-2xl font-bold text-primary">FluxChat</h1>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Real-Time Message Flow</p>
               </div>
             </div>
           </div>
