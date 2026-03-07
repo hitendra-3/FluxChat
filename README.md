@@ -1,72 +1,100 @@
-# FluxChat – Real-Time Message Flow
+# 🌊 FluxChat – Real-Time Message Flow
 
-**FluxChat** is a high-performance, real-time web application designed for seamless, fluid communication. The name **FluxChat** reflects the "flow" and transience of real-time messaging—where conversations move quickly and naturally.
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js" alt="Next.js" />
+  <img src="https://img.shields.io/badge/Socket.io-4.x-blue?style=for-the-badge&logo=socket.io" alt="Socket.io" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-3.x-38B2AC?style=for-the-badge&logo=tailwind-css" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=node.js" alt="Node.js" />
+</p>
 
-Built for privacy and speed, FluxChat operates without a persistent database. This means your private rooms and messages live only as long as you need them, offering a truly transient and secure chatting experience.
-
-## Features
-
-- **Real-Time Messaging**: Powered by Socket.IO for instantaneous, bi-directional "flux."
-- **Persistent Session Avatars**: Choose from 4 unique avatars (2 men, 2 women) that follow you globally across the sidebar, member lists, and chat bubbles.
-- **Dynamic Public & Private Rooms**: 
-  - **Public Lounge**: Join 6 permanent tech-focused rooms (`#cse`, `#tech`, `#coding`, `#ai`, `#webdev`, `#placements`) globally available to everyone.
-  - **Private Channels**: Create custom rooms with 4-digit codes to chat privately with friends.
-- **Auto-Evaporate Security**: Since FluxChat is database-free, all custom room data and messages are automatically cleared when the last user goes offline, ensuring no logs are left behind.
-- **Premium UI/UX**: A polished, iOS-inspired interface with responsive message bubbles, typing indicators, and mobile-first entry fields.
-
-## Tech Stack
-
-- **Frontend**: Next.js 16 (React) + Tailwind CSS.
-- **Backend**: Node.js + Express with Socket.IO.
-- **Avatars**: [DiceBear Avataaars](https://api.dicebear.com/7.x/avataaars/svg).
-- **Icons**: Lucide React.
-  
-## Getting Started (Local Development)
-
-### Prerequisites
-
-Ensure you have **Node.js** and **npm** installed.
-
-### Installation
-
-1. Clone or download the repository.
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-### Running Locally
-
-You need two terminals running simultaneously:
-
-1. **Terminal 1 (Socket Server)**:
-   ```bash
-   node server.js
-   ```
-
-2. **Terminal 2 (Frontend)**:
-   ```bash
-   npm run dev
-   ```
-
-Visit `http://localhost:3000` to start chatting!
-
-## Deployment Guide
-
-FluxChat requires a hosting provider that supports long-lived WebSockets. 
-
-### Recommended Platforms
-- **Railway.app / Render.com**: Highly recommended. These platforms can host both the Next.js frontend and the Node.js socket server in a single "Web Service" or as two linked services.
-- **DigitalOcean / AWS / Google Cloud (VPS)**: Ideal for full control. You can run both processes using a process manager like `pm2`.
-
-### Essential Deployment Steps
-1. **Environment Variables**: Ensure you set `NODE_ENV=production`.
-2. **Ports**: The socket server defaults to port `4000`. Ensure your firewall allows traffic on this port, or update `server.js` to use the environment's `PORT`.
-3. **Frontend Connection**: Update the socket connection URL in your frontend hooks (`useChat`) to point to your live server URL instead of `localhost`.
+**FluxChat** is a high-performance, real-time web application designed for seamless, fluid communication. The name represents the "flow" and transience of messaging—where conversations move quickly, naturally, and disappear when no longer needed.
 
 ---
 
-## Latest Improvements
-- **Mobile Input Optimization**: Redesigned the message input area into a unified pill container for better mobile usability.
-- **Member Awareness**: Users in the member list now show exactly which room they are in (e.g., *Active now (#cse)*).
-- **Branding**: Fully migrated to the **FluxChat** identity with updated metadata and visual styling.
+## ✨ Why FluxChat?
+
+In a world of permanent logs, **FluxChat** offers a breath of fresh air. Built for **privacy and speed**, it operates without a persistent database. 
+
+- **🔏 Database-Free**: Your conversations live only in memory. Once the room is empty, all messages evaporate.
+- **⚡ Real-Time Flux**: Built on WebSockets for instantaneous, low-latency messaging.
+- **🎨 Premium UI**: A modern, iOS-inspired aesthetic with smooth animations and a responsive mobile layout.
+
+---
+
+## 🚀 Key Features
+
+- **🛡️ Auto-Evaporate Security**: All custom room data and messages are wiped clean as soon as the last user leaves. No history, no logs, total privacy.
+- **👤 Persistent Avatars**: Select from a curated set of 2 male and 2 female avatars that follow you throughout your session.
+- **🌍 Tech Lounges**: Dive into 6 permanent professional rooms: `#cse`, `#tech`, `#coding`, `#ai`, `#webdev`, and `#placements`.
+- **🔑 Private Channels**: Create encrypted-by-nature private rooms locked with unique 4-digit codes.
+- **💬 Fluid UX**: Asymmetrical message bubbles, typing indicators with real-time feedback, and sleek mobile-first design.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: [Next.js](https://nextjs.org/) (React) + [Tailwind CSS](https://tailwindcss.com/)
+- **Backend**: [Node.js](https://nodejs.org/) + Express
+- **Real-Time**: [Socket.IO](https://socket.io/)
+- **Avatars**: [DiceBear Avataaars](https://api.dicebear.com/)
+- **Icons**: [Lucide React](https://lucide.dev/)
+
+---
+
+## 🚦 How It Works (The "Flux" Logic)
+
+```mermaid
+graph TD
+    A[User Joins] --> B{Choose Avatar}
+    B --> C[Enter Public or Private Room]
+    C --> D[Real-time Flux Connection]
+    D --> E[Messages Flow in Memory]
+    E --> F{All Users Exit?}
+    F -- Yes --> G[Session Data Evaporates]
+    F -- No --> E
+```
+
+---
+
+## 🏁 Getting Started (Local Development)
+
+### 1. Prerequisites
+Make sure you have [Node.js](https://nodejs.org/) and `npm` installed.
+
+### 2. Installation
+```bash
+git clone https://github.com/hitendra-3/FluxChat.git
+cd FluxChat
+npm install
+```
+
+### 3. Running Locally
+FluxChat requires two processes to run at once. Open two terminal windows:
+
+**Terminal 1 (Socket Backend):**
+```bash
+node server.js
+```
+
+**Terminal 2 (Frontend Interface):**
+```bash
+npm run dev
+```
+
+Open your browser at `http://localhost:3000` and start the flow!
+
+---
+
+## ☁️ Deployment
+
+Since FluxChat uses long-lived WebSockets, it performs best on platforms with persistent process support.
+
+- **Recommended**: [Railway.app](https://railway.app/) or [Render.com](https://render.com/).
+- **Scaling**: For high traffic, you can deploy the `server.js` and the Next.js frontend as separate, linked services.
+- **Config**: Ensure `NODE_ENV` is set to `production` and provide a `PORT` environment variable for the socket server.
+
+---
+
+<p align="center">
+  Built with ❤️ for real-time enthusiasts.
+</p>
