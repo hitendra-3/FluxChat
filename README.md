@@ -1,4 +1,4 @@
-# 🌊 FluxChat – Real-Time Message Flow
+# FluxChat – Real-Time Message Flow
 
 <p align="center">
   <img src="https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js" alt="Next.js" />
@@ -11,7 +11,7 @@
 
 ---
 
-## ✨ Why FluxChat?
+## Why FluxChat?
 
 In a world of permanent logs, **FluxChat** offers a breath of fresh air. Built for **privacy and speed**, it operates without a persistent database. 
 
@@ -21,7 +21,7 @@ In a world of permanent logs, **FluxChat** offers a breath of fresh air. Built f
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 - **🛡️ Auto-Evaporate Security**: All custom room data and messages are wiped clean as soon as the last user leaves. No history, no logs, total privacy.
 - **👤 Persistent Avatars**: Select from a curated set of 2 male and 2 female avatars that follow you throughout your session.
@@ -31,7 +31,7 @@ In a world of permanent logs, **FluxChat** offers a breath of fresh air. Built f
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Frontend**: [Next.js](https://nextjs.org/) (React) + [Tailwind CSS](https://tailwindcss.com/)
 - **Backend**: [Node.js](https://nodejs.org/) + Express
@@ -41,7 +41,7 @@ In a world of permanent logs, **FluxChat** offers a breath of fresh air. Built f
 
 ---
 
-## 🚦 How It Works (The "Flux" Logic)
+## How It Works (The "Flux" Logic)
 
 ```mermaid
 graph TD
@@ -56,7 +56,7 @@ graph TD
 
 ---
 
-## 🏁 Getting Started (Local Development)
+## Getting Started (Local Development)
 
 ### 1. Prerequisites
 Make sure you have [Node.js](https://nodejs.org/) and `npm` installed.
@@ -85,7 +85,7 @@ Open your browser at `http://localhost:3000` and start the flow!
 
 ---
 
-## ☁️ Deployment
+## Deployment
 
 Since FluxChat uses long-lived WebSockets, it performs best on platforms with persistent process support.
 
