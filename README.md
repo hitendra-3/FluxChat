@@ -97,7 +97,7 @@ Open your browser at `http://localhost:3000` and start the flow!
 
 Since FluxChat uses long-lived WebSockets, it performs best on platforms with persistent process support.
 
-- **Recommended**: [Railway.app](https://railway.app/) or [Render.com](https://render.com/).
+- **Recommended**: Railway.app (Backend) and Render.com (Frontend).
 - **Scaling**: For high traffic, you can deploy the `server.js` and the Next.js frontend as separate, linked services.
 - **Config**: Ensure `NODE_ENV` is set to `production` and provide a `PORT` environment variable for the socket server.
 
