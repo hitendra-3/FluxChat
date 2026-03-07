@@ -23,11 +23,19 @@ In a world of permanent logs, **FluxChat** offers a breath of fresh air. Built f
 
 ## Key Features
 
+- **🖼️ Advanced Photo Sharing**: Send high-quality images with a professional WhatsApp-style flow.
+  - **Live Preview**: See your image before sending.
+  - **Captions**: Add a message or caption directly to your photos.
+  - **Manual Send**: Full control over when your media is shared.
+- **✨ Professional Image Viewer**: A high-end modal for viewing shared photos.
+  - **Glassmorphism Backdrop**: Beautifully blurred background for focused viewing.
+  - **Snap-Fast Animations**: Optimized transitions for an "instant" feel.
+  - **Easy Controls**: One-click download and multiple ways to close (Click outside, 'X' button, or 'Esc').
 - **🛡️ Auto-Evaporate Security**: All custom room data and messages are wiped clean as soon as the last user leaves. No history, no logs, total privacy.
 - **👤 Persistent Avatars**: Select from a curated set of 2 male and 2 female avatars that follow you throughout your session.
 - **🌍 Tech Lounges**: Dive into 6 permanent professional rooms: `#cse`, `#tech`, `#coding`, `#ai`, `#webdev`, and `#placements`.
 - **🔑 Private Channels**: Create encrypted-by-nature private rooms locked with unique 4-digit codes.
-- **💬 Fluid UX**: Asymmetrical message bubbles, typing indicators with real-time feedback, and sleek mobile-first design.
+- **💎 Premium Design**: Custom professional blue scrollbar, sleekrounded containers, and perfectly aligned UI elements for a top-tier user experience.
 
 ---
 

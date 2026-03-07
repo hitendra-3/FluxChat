@@ -13,6 +13,7 @@ export interface Message {
   timestamp: Date;
   isOwn: boolean;
   isSystem?: boolean;
+  image?: string; // Base64 string for photo sharing
 }
 
 export interface ChatRoom {
@@ -42,7 +43,7 @@ export interface ChatContextType {
   onlineUsers: ChatUser[]; // Members for active room only
   typingUsers: string[];
   setActiveRoom: (roomId: string) => void;
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string, image?: string) => void;
   createRoom: (name: string, description?: string) => void;
   joinRoomByCode: (code: string) => void;
   setTypingUsers: (userIds: string[]) => void;
@@ -85,6 +86,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Socket listeners
   useEffect(() => {
+    function handleLoginAck(payload: any) {
+      const { user: serverUser, initialRooms } = payload || {};
+      if (initialRooms && Array.isArray(initialRooms)) {
+        setRooms(initialRooms.map((r: any) => ({
+          id: String(r.id),
+          name: r.name,
+          description: r.description,
+          memberCount: r.memberCount || 0,
+          unreadCount: 0,
+          createdAt: new Date(r.createdAt || Date.now()),
+          isPublic: true,
+          code: r.code || String(r.id),
+        })));
+      }
+    }
+
     function handleRoomJoined(payload: any) {
       const { room, members } = payload || {};
       if (!room) return;
@@ -178,6 +195,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         timestamp: new Date(message.timestamp || Date.now()),
         isOwn: user && !message.isSystem ? String(message.userId) === String(user.id) : false,
         isSystem: message.isSystem,
+        image: message.image,
       };
 
       setMessagesByRoom((prev) => ({
@@ -225,6 +243,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    socket.on('user:login:ack', handleLoginAck);
     socket.on('room:joined', handleRoomJoined);
     socket.on('room:members', handleRoomMembers);
     socket.on('message:new', handleMessageNew);
@@ -233,6 +252,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     socket.on('typing:stop', handleTypingStop);
 
     return () => {
+      socket.off('user:login:ack', handleLoginAck);
       socket.off('room:joined', handleRoomJoined);
       socket.off('room:members', handleRoomMembers);
       socket.off('message:new', handleMessageNew);
@@ -249,12 +269,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const sendMessage = (content: string) => {
-    if (!content.trim() || !activeRoomId || !socket || !user) return;
+  const sendMessage = (content: string, image?: string) => {
+    if ((!content.trim() && !image) || !activeRoomId || !socket || !user) return;
 
     socket.emit('message:send', {
       roomId: activeRoomId,
       content: content.trim(),
+      image,
     });
 
     // Auto-stop typing on send
@@ -278,6 +299,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       code: trimmed,
     });
   };
+
+
 
   const setTypingUsers = (userIds: string[]) => {
     // This function can be kept for backward compatibility or removed if you prefer

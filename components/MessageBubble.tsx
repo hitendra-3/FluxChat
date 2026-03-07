@@ -5,12 +5,16 @@ import { Message } from '@/contexts/ChatContext';
 import { Avatar } from './ui/Avatar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ImageModal } from './ui/ImageModal';
+import { useState } from 'react';
 
 interface MessageBubbleProps {
   message: Message;
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   if (message.isSystem) {
     return (
       <div className="flex justify-center my-2">
@@ -58,9 +62,29 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               : 'bg-muted/80 text-foreground rounded-bl-[4px]'
           )}
         >
-          <p className="text-sm leading-relaxed break-words">{message.content}</p>
+          {message.image && (
+            <div className="mb-2 overflow-hidden rounded-lg">
+              <img
+                src={message.image}
+                alt="Shared content"
+                className="max-w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                onClick={() => setIsModalOpen(true)}
+              />
+            </div>
+          )}
+          {message.content && (
+            <p className="text-sm leading-relaxed break-words">{message.content}</p>
+          )}
         </div>
       </div>
+
+      {message.image && (
+        <ImageModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          imageUrl={message.image}
+        />
+      )}
     </div>
   );
 }

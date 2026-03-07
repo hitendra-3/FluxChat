@@ -2,7 +2,7 @@
 
 const { Server } = require('socket.io');
 
-const PORT = process.env.SOCKET_PORT || 4000;
+const PORT = process.env.PORT || process.env.SOCKET_PORT || 4000;
 
 /**
  * @typedef {Object} User
@@ -106,37 +106,30 @@ io.on('connection', (socket) => {
     const record = usersById.get(userId);
 
     // Auto join default rooms
+    const initialRooms = [];
     for (const dRoom of defaultRooms) {
       const r = rooms.get(dRoom.id);
       r.members.add(userId);
       record.rooms.add(dRoom.id);
+
+      initialRooms.push({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        memberCount: r.members.size,
+        unreadCount: 0,
+        createdAt: r.createdAt,
+        isPublic: true,
+        code: r.id,
+      });
     }
 
-    socket.emit('user:login:ack', { user });
+    socket.emit('user:login:ack', { user, initialRooms });
 
-    // Join socket to all rooms and emit updates
+    // Join socket to all rooms
     for (const roomId of record.rooms) {
       socket.join(roomId);
-      const room = rooms.get(roomId);
-      if (!room) continue;
-
       const members = getRoomMembers(roomId);
-
-      socket.emit('room:joined', {
-        room: {
-          id: room.id,
-          name: room.name,
-          description: room.description,
-          memberCount: members.length,
-          unreadCount: 0,
-          createdAt: room.createdAt,
-          isPublic: false,
-          code: room.id,
-        },
-        members,
-        isCreator: false,
-      });
-
       io.to(roomId).emit('room:members', {
         roomId,
         members,
@@ -293,9 +286,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('message:send', (payload) => {
-    const { roomId, content } = payload || {};
+    const { roomId, content, image } = payload || {};
     const userId = socket.data.userId;
-    if (!userId || !roomId || !content?.trim()) return;
+    if (!userId || !roomId || (!content?.trim() && !image)) return;
 
     const userRecord = usersById.get(userId);
     if (!userRecord) return;
@@ -306,7 +299,8 @@ io.on('connection', (socket) => {
       userId: userRecord.user.id,
       username: userRecord.user.username,
       avatar: userRecord.user.avatar,
-      content: content.trim(),
+      content: content?.trim() || '',
+      image,
       timestamp: new Date().toISOString(),
     };
 
