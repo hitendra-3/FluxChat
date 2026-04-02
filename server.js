@@ -1,8 +1,16 @@
-// Simple Socket.IO server for real-time chat rooms with 4-digit codes
+// Next.js custom server with real-time chat rooms with 4-digit codes
 
+const { createServer } = require('http');
+const { parse } = require('url');
+const next = require('next');
 const { Server } = require('socket.io');
 
-const PORT = process.env.PORT || process.env.SOCKET_PORT || 4000;
+const dev = process.env.NODE_ENV !== 'production';
+const hostname = 'localhost';
+const PORT = process.env.PORT || 3000;
+
+const app = next({ dev, hostname, port: PORT });
+const handle = app.getRequestHandler();
 
 /**
  * @typedef {Object} User
@@ -43,14 +51,26 @@ for (const room of defaultRooms) {
   rooms.set(room.id, room);
 }
 
-const io = new Server(PORT, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST'],
-  },
-});
+app.prepare().then(() => {
+  const httpServer = createServer(async (req, res) => {
+    try {
+      const parsedUrl = parse(req.url, true);
+      await handle(req, res, parsedUrl);
+    } catch (err) {
+      console.error('Error occurred handling', req.url, err);
+      res.statusCode = 500;
+      res.end('internal server error');
+    }
+  });
 
-console.log(`Socket.IO server running on port ${PORT}`);
+  const io = new Server(httpServer, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST'],
+    },
+  });
+
+  console.log(`Socket.IO attached to Next.js server on port ${PORT}`);
 
 function generateRoomCode() {
   // Ensure unique 4-digit numeric code
@@ -393,6 +413,12 @@ io.on('connection', (socket) => {
       }
       console.log('Session wiped and defaults restored.');
     }
+  });
+});
+
+  httpServer.listen(PORT, (err) => {
+    if (err) throw err;
+    console.log(`> Ready on http://${hostname}:${PORT}`);
   });
 });
 
