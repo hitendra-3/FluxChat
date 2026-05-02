@@ -3,6 +3,15 @@
 import React, { createContext, ReactNode, useEffect, useState } from 'react';
 import { getSocket } from '@/lib/socket';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  avatar: string;
+  socketId?: string;
+}
 
 export interface Message {
   id: string;
@@ -10,324 +19,260 @@ export interface Message {
   username: string;
   avatar: string;
   content: string;
-  timestamp: Date;
-  isOwn: boolean;
-  isSystem?: boolean;
-  image?: string; // Base64 string for photo sharing
+  image?: string;
+  timestamp: string;
 }
 
 export interface ChatRoom {
   id: string;
   name: string;
-  description: string;
-  memberCount: number;
-  unreadCount: number;
-  lastMessage?: Message;
-  createdAt: Date;
-  isPublic?: boolean;
-  code?: string; // 4-digit join code (same as id on server)
-}
-
-export interface ChatUser {
-  id: string;
-  username: string;
-  avatar: string;
-  status: 'online' | 'away' | 'offline';
-  lastSeen: Date;
+  is_private: boolean;
+  created_by: string;
 }
 
 export interface ChatContextType {
   rooms: ChatRoom[];
-  activeRoomId: string | null;
-  messages: Message[]; // Messages for active room only
-  onlineUsers: ChatUser[]; // Members for active room only
-  typingUsers: string[];
-  setActiveRoom: (roomId: string) => void;
-  sendMessage: (content: string, image?: string) => void;
-  createRoom: (name: string, description?: string) => void;
-  joinRoomByCode: (code: string) => void;
-  setTypingUsers: (userIds: string[]) => void;
+  activeRoom: ChatRoom | null;
+  messages: Message[];
+  members: User[];
+  pendingMembers: User[];
+  sendMessage: (roomId: string, content: string, image?: string) => void;
+  joinRoom: (roomId: string, code?: string) => void;
+  createRoom: (name: string, isPrivate: boolean, code?: string) => void;
+  kickUser: (roomId: string, targetUserId: string) => void;
+  deleteRoom: (roomId: string) => void;
+  approveJoin: (roomId: string, targetSocketId: string) => void;
+  rejectJoin: (roomId: string, targetSocketId: string) => void;
+  setRooms: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
-  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-  const [messagesByRoom, setMessagesByRoom] = useState<Record<string, Message[]>>({});
-  const [onlineUsersByRoom, setOnlineUsersByRoom] = useState<Record<string, ChatUser[]>>({});
-  const [typingUsersByRoom, setTypingUsersByRoom] = useState<Record<string, Set<string>>>({});
-  const [socket] = useState(() => getSocket());
+  const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [members, setMembers] = useState<User[]>([]);
+  const [pendingMembers, setPendingMembers] = useState<User[]>([]);
+  const [socket, setSocket] = useState<any>(null);
 
-  // Connect/disconnect socket based on auth user
   useEffect(() => {
-    if (user) {
-      if (!socket.connected) {
-        socket.connect();
-      }
-
-      socket.emit('user:login', {
-        userId: user.id,
-        username: user.username,
-        avatar: user.avatar,
-      });
+    if (activeRoom) {
+      (window as any)._activeRoomId = activeRoom.id;
     } else {
-      if (socket.connected) {
-        socket.disconnect();
-      }
-      setRooms([]);
-      setActiveRoomId(null);
-      setMessagesByRoom({});
-      setOnlineUsersByRoom({});
-      setTypingUsersByRoom({});
+      (window as any)._activeRoomId = null;
     }
-  }, [socket, user]);
+  }, [activeRoom]);
 
-  // Socket listeners
   useEffect(() => {
-    function handleLoginAck(payload: any) {
-      const { user: serverUser, initialRooms } = payload || {};
-      if (initialRooms && Array.isArray(initialRooms)) {
-        setRooms(initialRooms.map((r: any) => ({
-          id: String(r.id),
-          name: r.name,
-          description: r.description,
-          memberCount: r.memberCount || 0,
-          unreadCount: 0,
-          createdAt: new Date(r.createdAt || Date.now()),
-          isPublic: true,
-          code: r.code || String(r.id),
-        })));
-      }
+    if (session?.access_token && !socket) {
+      const s = getSocket(session.access_token);
+      setSocket(s);
+      s.connect();
     }
+  }, [session, socket]);
 
-    function handleRoomJoined(payload: any) {
-      const { room, members } = payload || {};
-      if (!room) return;
+  useEffect(() => {
+    if (!socket) return;
 
-      const roomId = String(room.id);
+    socket.on('connect', () => {
+      const lastRoomId = localStorage.getItem('last_room_id');
+      if (lastRoomId) {
+        const savedPins = JSON.parse(localStorage.getItem('fluxchat_pins') || '{}');
+        socket.emit('room:join', { roomId: lastRoomId, code: savedPins[lastRoomId] });
+      }
+    });
 
-      setRooms((prev) => {
-        const exists = prev.find((r) => r.id === roomId);
-        const baseRoom: ChatRoom = {
-          id: roomId,
-          name: room.name,
-          description: room.description || 'Private room',
-          memberCount: Array.isArray(members) ? members.length : room.memberCount || 1,
-          unreadCount: 0,
-          createdAt: new Date(room.createdAt || Date.now()),
-          isPublic: !!room.isPublic,
-          code: room.code || roomId,
-        };
-        if (!exists) {
-          return [...prev, baseRoom];
+    socket.on('room:history', ({ messages, metadata }: any) => {
+      setMessages(messages);
+      setActiveRoom(metadata);
+    });
+
+    socket.on('message:new', (msg: any) => {
+      setMessages((prev) => {
+        // 🛡️ STRICT ISOLATION: Only add if message belongs to the current room
+        const currentActiveRoom = (window as any)._activeRoomId;
+        if (msg.roomId && msg.roomId !== currentActiveRoom) return prev;
+
+        const localIndex = prev.findIndex(m => m.id.startsWith('local-') && m.content === msg.content && m.userId === msg.userId);
+        if (localIndex !== -1) {
+          const newMessages = [...prev];
+          newMessages[localIndex] = msg;
+          return newMessages;
         }
-        return prev.map((r) =>
-          r.id === roomId
-            ? {
-              ...r,
-              memberCount: baseRoom.memberCount,
-              description: baseRoom.description,
-              code: baseRoom.code,
-            }
-            : r
-        );
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
       });
+    });
 
-      if (Array.isArray(members)) {
-        setOnlineUsersByRoom((prev) => ({
-          ...prev,
-          [roomId]: members.map((m: any) => ({
-            id: String(m.id),
-            username: m.username,
-            avatar: m.avatar || String(m.id),
-            status: m.status || 'online',
-            lastSeen: new Date(),
-          })),
-        }));
+    socket.on('room:members', (data: { active: User[], pending: User[] }) => {
+      setMembers(data.active || []);
+      setPendingMembers(data.pending || []);
+    });
+
+    socket.on('room:pending', ({ roomId }: any) => {
+      console.log('[Socket] 🔒 Room Pending Event Received:', roomId);
+      toast.info('Access request submitted. Awaiting administrator approval.', {
+        duration: 2000,
+        position: 'top-center'
+      });
+      setMessages([{ 
+        id: 'system', 
+        content: '🔒 Access request submitted. Awaiting administrator approval.', 
+        userId: 'system', 
+        username: 'System', 
+        avatar: 'system', 
+        timestamp: new Date().toISOString() 
+      }]);
+    });
+
+    socket.on('room:approved', ({ roomId, code, room }: any) => {
+      toast.success('Access granted! Welcome to the sector.');
+      // 🌟 Save to localStorage
+      const savedPins = JSON.parse(localStorage.getItem('fluxchat_pins') || '{}');
+      savedPins[roomId] = code;
+      localStorage.setItem('fluxchat_pins', JSON.stringify(savedPins));
+      
+      // ⚡ Direct Inject into sidebar list
+      if (room) {
+        setRooms(prev => {
+          if (prev.find(r => r.id === room.id)) return prev;
+          return [room, ...prev];
+        });
       }
+      window.dispatchEvent(new Event('refresh_rooms'));
+    });
 
-      setActiveRoomId(roomId);
-    }
+    socket.on('room:kicked', ({ roomId }: any) => {
+      toast.error('You have been kicked');
+      setActiveRoom(null);
+      // Force vanish from sidebar memory
+      const savedPins = JSON.parse(localStorage.getItem('fluxchat_pins') || '{}');
+      delete savedPins[roomId];
+      localStorage.setItem('fluxchat_pins', JSON.stringify(savedPins));
+      // Refresh sidebar if it's open
+      window.dispatchEvent(new Event('refresh_rooms'));
+    });
 
-    function handleRoomMembers(payload: any) {
-      const { roomId, members } = payload || {};
-      if (!roomId || !Array.isArray(members)) return;
+    socket.on('room:rejected', ({ roomId }: any) => {
+      toast.error('Access denied by owner.');
+      setActiveRoom(null);
+      const savedPins = JSON.parse(localStorage.getItem('fluxchat_pins') || '{}');
+      delete savedPins[roomId];
+      localStorage.setItem('fluxchat_pins', JSON.stringify(savedPins));
+      window.dispatchEvent(new Event('refresh_rooms'));
+    });
 
-      const id = String(roomId);
+    socket.on('room:deleted', () => {
+      setActiveRoom(null);
+    });
 
-      setOnlineUsersByRoom((prev) => ({
-        ...prev,
-        [id]: members.map((m: any) => ({
-          id: String(m.id),
-          username: m.username,
-          avatar: m.avatar || String(m.id),
-          status: m.status || 'online',
-          lastSeen: new Date(),
-        })),
-      }));
-
-      setRooms((prev) =>
-        prev.map((r) =>
-          r.id === id
-            ? {
-              ...r,
-              memberCount: members.length,
-            }
-            : r
-        )
-      );
-    }
-
-    function handleMessageNew(payload: any) {
-      const { roomId, message } = payload || {};
-      if (!roomId || !message) return;
-
-      const id = String(roomId);
-
-      const transformed: Message = {
-        id: message.id,
-        userId: String(message.userId),
-        username: message.username,
-        avatar: message.avatar || String(message.userId),
-        content: message.content,
-        timestamp: new Date(message.timestamp || Date.now()),
-        isOwn: user && !message.isSystem ? String(message.userId) === String(user.id) : false,
-        isSystem: message.isSystem,
-        image: message.image,
-      };
-
-      setMessagesByRoom((prev) => ({
-        ...prev,
-        [id]: [...(prev[id] || []), transformed],
-      }));
-
-      setRooms((prev) =>
-        prev.map((r) =>
-          r.id === id
-            ? {
-              ...r,
-              lastMessage: transformed,
-            }
-            : r
-        )
-      );
-    }
-
-    function handleRoomError(payload: any) {
-      console.error('Room error:', payload?.message || payload);
-    }
-
-    function handleTypingStart(payload: any) {
-      const { roomId, userId } = payload || {};
-      if (!roomId || !userId || String(userId) === String(user?.id)) return;
-
-      setTypingUsersByRoom((prev) => {
-        const roomTyping = prev[roomId] || new Set<string>();
-        const newSet = new Set(roomTyping);
-        newSet.add(String(userId));
-        return { ...prev, [roomId]: newSet };
+    socket.on('room:force_add', ({ room }: any) => {
+      setRooms(prev => {
+        if (prev.find(r => r.id === room.id)) return prev;
+        return [room, ...prev];
       });
-    }
+    });
 
-    function handleTypingStop(payload: any) {
-      const { roomId, userId } = payload || {};
-      if (!roomId || !userId) return;
+    socket.on('room:force_remove', ({ roomId }: any) => {
+      setRooms(prev => prev.filter(r => r.id !== roomId));
+    });
 
-      setTypingUsersByRoom((prev) => {
-        const roomTyping = prev[roomId] || new Set<string>();
-        const newSet = new Set(roomTyping);
-        newSet.delete(String(userId));
-        return { ...prev, [roomId]: newSet };
-      });
-    }
+    socket.on('rooms:updated', () => {
+      window.dispatchEvent(new Event('refresh_rooms'));
+    });
 
-    socket.on('user:login:ack', handleLoginAck);
-    socket.on('room:joined', handleRoomJoined);
-    socket.on('room:members', handleRoomMembers);
-    socket.on('message:new', handleMessageNew);
-    socket.on('room:error', handleRoomError);
-    socket.on('typing:start', handleTypingStart);
-    socket.on('typing:stop', handleTypingStop);
+    socket.on('room:created', (newRoom: any) => {
+      toast.success(`Room "${newRoom.name}" created!`);
+      const code = newRoom.join_code;
+      joinRoom(newRoom.id, code);
+      // Ensure it's in the list immediately
+      setRooms(prev => [newRoom, ...prev.filter(r => r.id !== newRoom.id)]);
+    });
+
+    socket.on('error', (err: any) => {
+      toast.error(err.message || 'Error');
+    });
 
     return () => {
-      socket.off('user:login:ack', handleLoginAck);
-      socket.off('room:joined', handleRoomJoined);
-      socket.off('room:members', handleRoomMembers);
-      socket.off('message:new', handleMessageNew);
-      socket.off('room:error', handleRoomError);
-      socket.off('typing:start', handleTypingStart);
-      socket.off('typing:stop', handleTypingStop);
+      socket.off('connect');
+      socket.off('message:new');
+      socket.off('room:history');
+      socket.off('room:members');
+      socket.off('room:kicked');
+      socket.off('room:deleted');
+      socket.off('room:created');
+      socket.off('error');
+      socket.off('room:pending');
+      socket.off('room:approved');
+      socket.off('room:rejected');
     };
-  }, [socket, user]);
+  }, [socket]);
 
-  const setActiveRoom = (roomId: string) => {
-    setActiveRoomId(roomId);
-    if (socket && socket.connected) {
-      socket.emit('user:active_room', { roomId });
+  const joinRoom = (roomId: string, code?: string) => {
+    localStorage.setItem('last_room_id', roomId);
+    if (code) {
+      const savedPins = JSON.parse(localStorage.getItem('fluxchat_pins') || '{}');
+      savedPins[roomId] = code;
+      localStorage.setItem('fluxchat_pins', JSON.stringify(savedPins));
     }
+    socket?.emit('room:join', { roomId, code });
   };
 
-  const sendMessage = (content: string, image?: string) => {
-    if ((!content.trim() && !image) || !activeRoomId || !socket || !user) return;
+  const createRoom = (name: string, isPrivate: boolean, code?: string) => {
+    socket?.emit('room:create', { name, isPrivate, code });
+  };
 
-    socket.emit('message:send', {
-      roomId: activeRoomId,
-      content: content.trim(),
+  const sendMessage = (roomId: string, content: string, image?: string) => {
+    if (!socket || !user) return;
+    const localMsg: Message = {
+      id: `local-${Date.now()}`,
+      userId: user.id,
+      username: user.user_metadata?.username || user.email?.split('@')[0],
+      avatar: user.user_metadata?.avatar_url || '',
+      content,
       image,
-    });
-
-    // Auto-stop typing on send
-    socket.emit('typing:stop', { roomId: activeRoomId });
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, localMsg]);
+    socket.emit('message:send', { roomId, content, image });
   };
 
-  const createRoom = (name: string, description?: string) => {
-    if (!socket || !user || !name.trim()) return;
-
-    socket.emit('room:create', {
-      name: name.trim(),
-      description: description?.trim(),
-    });
+  const kickUser = (roomId: string, targetUserId: string) => {
+    socket?.emit('room:kick', { roomId, targetUserId });
   };
 
-  const joinRoomByCode = (code: string) => {
-    const trimmed = code.trim();
-    if (!socket || !user || !trimmed) return;
-
-    socket.emit('room:join', {
-      code: trimmed,
-    });
+  const deleteRoom = (roomId: string) => {
+    socket?.emit('room:delete', { roomId });
   };
 
-
-
-  const setTypingUsers = (userIds: string[]) => {
-    // This function can be kept for backward compatibility or removed if you prefer
-    // Since we handle typing internally now via socket events, we can leave this mostly empty.
+  const approveJoin = (roomId: string, targetSocketId: string) => {
+    socket?.emit('room:approve', { roomId, targetSocketId });
   };
 
-  const activeRoomMessages = activeRoomId ? messagesByRoom[activeRoomId] || [] : [];
-  const activeRoomUsers = activeRoomId ? onlineUsersByRoom[activeRoomId] || [] : [];
-  const typingUsers = activeRoomId ? Array.from(typingUsersByRoom[activeRoomId] || []) : [];
-
-  const value: ChatContextType = {
-    rooms,
-    activeRoomId,
-    messages: activeRoomMessages,
-    onlineUsers: activeRoomUsers,
-    typingUsers,
-    setActiveRoom,
-    sendMessage,
-    createRoom,
-    joinRoomByCode,
-    setTypingUsers,
+  const rejectJoin = (roomId: string, targetSocketId: string) => {
+    socket?.emit('room:reject', { roomId, targetSocketId });
   };
 
   return (
-    <ChatContext.Provider value={value}>
+    <ChatContext.Provider value={{
+      rooms,
+      activeRoom,
+      messages,
+      members,
+      pendingMembers,
+      sendMessage,
+      joinRoom,
+      createRoom,
+      kickUser,
+      deleteRoom,
+      approveJoin,
+      rejectJoin,
+      rooms,
+      setRooms
+    }}>
       {children}
     </ChatContext.Provider>
   );
 }
-

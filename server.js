@@ -1,9 +1,12 @@
-// Next.js custom server with real-time chat rooms with 4-digit codes
-
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { createClient } = require('@supabase/supabase-js');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -12,44 +15,15 @@ const PORT = process.env.PORT || 3000;
 const app = next({ dev, hostname, port: PORT });
 const handle = app.getRequestHandler();
 
-/**
- * @typedef {Object} User
- * @property {string} id
- * @property {string} username
- * @property {string} avatar
- * @property {'online' | 'away' | 'offline'} status
- * @property {string|null} activeRoom
- */
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
-/**
- * @typedef {Object} Room
- * @property {string} id
- * @property {string} name
- * @property {string} description
- * @property {number} createdAt
- * @property {Set<string>} members // userIds
- * @property {boolean} isDefault
- */
-
-// In-memory stores
-/** @type {Map<string, { socketId: string, user: User, rooms: Set<string> }>} */
-const usersById = new Map();
-/** @type {Map<string, Room>} */
-const rooms = new Map();
-
-// Initialize default rooms
-const defaultRooms = [
-  { id: 'cse', name: 'cse', description: 'CSE Students Lounge', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true },
-  { id: 'tech', name: 'tech', description: 'Tech Talk & News', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true },
-  { id: 'coding', name: 'coding', description: 'Coding & Algorithms', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true },
-  { id: 'ai', name: 'ai', description: 'Artificial Intelligence', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true },
-  { id: 'webdev', name: 'webdev', description: 'Web Development', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true },
-  { id: 'placements', name: 'placements', description: 'Job Placements & Prep', createdAt: Date.now(), members: new Set(), isDefault: true, isPublic: true }
-];
-
-for (const room of defaultRooms) {
-  rooms.set(room.id, room);
-}
+const userProfiles = new Map(); // userId -> profile
+const activeRooms = new Map(); // roomId -> { users: Map, messages: [], metadata: {} }
+const socketToUser = new Map(); // socketId -> userId
+const evaporationTimers = new Map(); // roomId -> Timeout
 
 app.prepare().then(() => {
   const httpServer = createServer(async (req, res) => {
@@ -64,357 +38,348 @@ app.prepare().then(() => {
   });
 
   const io = new Server(httpServer, {
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST'],
-    },
+    cors: { origin: '*', methods: ['GET', 'POST'] },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['websocket']
   });
 
-  console.log(`Socket.IO attached to Next.js server on port ${PORT}`);
+  io.use(async (socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (!token) {
+      console.warn('[Socket Auth] ⚠️ No token provided');
+      return next(new Error('No token'));
+    }
 
-function generateRoomCode() {
-  // Ensure unique 4-digit numeric code
-  let code;
-  do {
-    code = String(Math.floor(1000 + Math.random() * 9000));
-  } while (rooms.has(code));
-  return code;
-}
+    try {
+      // Use Supabase built-in verification (works for HS256, ES256, etc.)
+      const { data: { user }, error } = await supabase.auth.getUser(token);
 
-function getRoomMembers(roomId) {
-  const room = rooms.get(roomId);
-  if (!room) return [];
-  const result = [];
-  for (const userId of room.members) {
-    const record = usersById.get(userId);
-    if (record) {
-      let status = record.user.status;
-      if (status === 'online' && record.user.activeRoom !== roomId) {
-        status = 'away';
+      if (error || !user) {
+        console.error('[Socket Auth] ❌ Verification failed:', error?.message || 'User not found');
+        return next(new Error('Invalid token'));
       }
-      result.push({ ...record.user, status });
-    }
-  }
-  return result;
-}
 
-io.on('connection', (socket) => {
-  console.log(`Client connected: ${socket.id}`);
-
-  socket.on('user:login', (payload) => {
-    const { userId, username, avatar } = payload || {};
-    if (!userId || !username) return;
-
-    let existingRecord = usersById.get(userId);
-
-    const user = {
-      id: userId,
-      username,
-      avatar: avatar || userId,
-      status: 'online',
-      activeRoom: null
-    };
-
-    usersById.set(userId, {
-      socketId: socket.id,
-      user,
-      rooms: existingRecord ? existingRecord.rooms : new Set(),
-    });
-
-    socket.data.userId = userId;
-
-    const record = usersById.get(userId);
-
-    // Auto join default rooms
-    const initialRooms = [];
-    for (const dRoom of defaultRooms) {
-      const r = rooms.get(dRoom.id);
-      r.members.add(userId);
-      record.rooms.add(dRoom.id);
-
-      initialRooms.push({
-        id: r.id,
-        name: r.name,
-        description: r.description,
-        memberCount: r.members.size,
-        unreadCount: 0,
-        createdAt: r.createdAt,
-        isPublic: true,
-        code: r.id,
-      });
-    }
-
-    socket.emit('user:login:ack', { user, initialRooms });
-
-    // Join socket to all rooms
-    for (const roomId of record.rooms) {
-      socket.join(roomId);
-      const members = getRoomMembers(roomId);
-      io.to(roomId).emit('room:members', {
-        roomId,
-        members,
-      });
+      socket.data.user = { sub: user.id, email: user.email };
+      console.log(`[Socket Auth] ✅ Success: ${user.email}`);
+      next();
+    } catch (err) { 
+      console.error('[Socket Auth] ❌ Internal Error:', err.message);
+      next(new Error('Authentication error')); 
     }
   });
 
-  socket.on('user:active_room', (payload) => {
-    const { roomId } = payload || {};
-    const userId = socket.data.userId;
-    if (!userId) return;
-
-    const record = usersById.get(userId);
-    if (!record) return;
-
-    record.user.activeRoom = roomId;
-
-    // Broadcasting updated statuses to all rooms this user is in
-    for (const joinedRoomId of record.rooms) {
-      const members = getRoomMembers(joinedRoomId);
-      io.to(joinedRoomId).emit('room:members', {
-        roomId: joinedRoomId,
-        members,
-      });
-    }
-  });
-
-  socket.on('room:create', (payload) => {
-    const { name, description } = payload || {};
-    const userId = socket.data.userId;
-    if (!userId || !name) return;
-
-    const userRecord = usersById.get(userId);
-    if (!userRecord) return;
-
-    const code = generateRoomCode();
-    const room = {
-      id: code,
-      name,
-      description: description || 'Private room',
-      createdAt: Date.now(),
-      members: new Set([userId]),
-      isDefault: false
-    };
-
-    rooms.set(code, room);
-    userRecord.rooms.add(code);
-
-    socket.join(code);
-    userRecord.user.activeRoom = code;
-
-    const members = getRoomMembers(code);
-
-    socket.emit('room:joined', {
-      room: {
-        id: room.id,
-        name: room.name,
-        description: room.description,
-        memberCount: members.length,
-        unreadCount: 0,
-        createdAt: room.createdAt,
-        isPublic: false,
-        code: room.id,
-      },
-      members,
-      isCreator: true,
+  const getRoomMembers = async (roomId) => {
+    const room = activeRooms.get(roomId);
+    if (!room) return { active: [], pending: [] };
+    
+    // 1. Get Live Members
+    const active = [];
+    room.users.forEach((uId, sId) => {
+      const profile = userProfiles.get(uId);
+      if (profile) active.push({ ...profile, socketId: sId, isActive: true });
     });
 
-    // Broadcast members
-    io.to(code).emit('room:members', {
-      roomId: code,
-      members,
+    // 2. Get Pending Members
+    const pending = [];
+    room.pending?.forEach((uId, sId) => {
+      const profile = userProfiles.get(uId);
+      if (profile) pending.push({ ...profile, socketId: sId });
     });
 
-    // System message
-    const joinMessage = {
-      id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      roomId: code,
-      userId: 'system',
-      username: 'System',
-      avatar: 'system',
-      content: `${userRecord.user.username} created the room.`,
-      timestamp: new Date().toISOString(),
-      isSystem: true,
-    };
-    io.to(code).emit('message:new', {
-      roomId: code,
-      message: joinMessage,
-    });
-  });
+    // 3. For Private Rooms, fetch Offline Approved Users (including owner)
+    if (room.metadata.is_private) {
+      const liveUserIds = new Set(active.map(m => m.id));
+      
+      // Ensure owner is always in the consideration list
+      const rosterIds = new Set(room.approvedUserIds);
+      if (room.metadata.created_by) rosterIds.add(room.metadata.created_by);
+      
+      const offlineIds = Array.from(rosterIds).filter(id => !liveUserIds.has(id));
 
-  socket.on('room:join', (payload) => {
-    const { code } = payload || {};
-    const userId = socket.data.userId;
-    if (!userId || !code) return;
-
-    const room = rooms.get(code);
-    if (!room) {
-      socket.emit('room:error', { message: 'Room not found. Check the 4-digit code.' });
-      return;
+      if (offlineIds.length > 0) {
+        const { data: offlineProfiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', offlineIds);
+          
+        const offline = (offlineProfiles || []).map(p => ({
+          ...p,
+          isActive: false
+        }));
+        
+        return { active: [...active, ...offline], pending };
+      }
     }
 
-    const userRecord = usersById.get(userId);
-    if (!userRecord) {
-      socket.emit('room:error', { message: 'User not registered on server.' });
-      return;
+    return { active, pending };
+  };
+
+  io.on('connection', async (socket) => {
+    const userId = socket.data.user.sub;
+    console.log(`[Socket] User connecting: ${userId}`);
+    
+    // Helper to get a Supabase client authorized as this user
+    const getUserSupabase = () => createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      { global: { headers: { Authorization: `Bearer ${socket.handshake.auth.token}` } } }
+    );
+
+    const userSupabase = getUserSupabase();
+    const { data: profile, error: profileErr } = await userSupabase.from('profiles').select('*').eq('id', userId).single();
+    
+    if (profileErr || !profile) {
+      console.error(`[Socket] Profile fetch error for ${userId}:`, profileErr);
+      return socket.disconnect();
     }
 
-    room.members.add(userId);
-    userRecord.rooms.add(code);
+    userProfiles.set(userId, profile);
+    socketToUser.set(socket.id, userId);
+    console.log(`[Socket] User authenticated: ${profile.username}`);
 
-    socket.join(code);
-    userRecord.user.activeRoom = code;
+    socket.on('room:join', async ({ roomId, code }) => {
+      const sRoomId = String(roomId); // 🛡️ Normalize ID type
+      
+      // Cleanup existing room memberships (Strict Decoupling)
+      for (const [rId, room] of activeRooms.entries()) {
+        if (room.users.has(socket.id)) {
+          room.users.delete(socket.id);
+          socket.leave(rId); 
+          const members = await getRoomMembers(rId);
+          io.to(rId).emit('room:members', members);
+        }
+      }
 
-    const members = getRoomMembers(code);
+      let room = activeRooms.get(sRoomId);
+      
+      try {
+        const { data: dbRoom } = await supabase.from('rooms').select('*').eq('id', sRoomId).single();
+        if (!dbRoom && !['general', 'tech-talk', 'ai-lounge'].includes(sRoomId.toLowerCase())) {
+          return socket.emit('error', { message: 'Room not found' });
+        }
 
-    // Notify joining user
-    socket.emit('room:joined', {
-      room: {
-        id: room.id,
-        name: room.name,
-        description: room.description,
-        memberCount: members.length,
-        unreadCount: 0,
-        createdAt: room.createdAt,
-        isPublic: false,
-        code: room.id,
-      },
-      members,
-      isCreator: false,
+        if (!room) {
+          console.log(`[Socket] 🏗️ Initializing Persistence for Room: ${sRoomId}`);
+          const isGlobal = ['general', 'tech-talk', 'ai-lounge'].includes(sRoomId.toLowerCase());
+          room = { 
+            users: new Map(), 
+            messages: [], 
+            metadata: dbRoom || { id: sRoomId, name: sRoomId, is_private: false },
+            pending: new Map(),
+            approvedUserIds: new Set(dbRoom?.approved_ids || []) 
+          };
+          activeRooms.set(sRoomId, room);
+        }
+
+        // Security check for private rooms
+        if (room.metadata.is_private && room.metadata.created_by !== userId) {
+          // 🛡️ PERMANENT CHECK: Check DB-synced approvals
+          const isTrusted = room.approvedUserIds.has(userId);
+          
+          if (!isTrusted) {
+            if (!code || !await bcrypt.compare(code, room.metadata.code_hash)) {
+              return socket.emit('error', { message: 'Invalid join code' });
+            }
+            
+            room.pending.set(socket.id, userId);
+            socket.join(sRoomId);
+            io.to(sRoomId).emit('room:members', await getRoomMembers(sRoomId));
+            return socket.emit('room:pending', { roomId: sRoomId });
+          }
+        }
+
+        // Normal Join
+        room.users.set(socket.id, userId);
+        socket.join(sRoomId);
+        io.to(sRoomId).emit('room:members', await getRoomMembers(sRoomId));
+        
+        // 🔍 DEEP LOGGING: Check history integrity
+        const imgCount = room.messages.filter(m => !!m.image).length;
+        console.log(`[Socket] 📜 Sending History for ${sRoomId}: ${room.messages.length} msgs (${imgCount} images)`);
+        
+        socket.emit('room:history', { messages: room.messages, metadata: room.metadata });
+      } catch (err) {
+        console.error('[Socket] Join Error:', err);
+        socket.emit('error', { message: 'Internal joining error' });
+      }
     });
 
-    // Update members list for everyone in the room
-    io.to(code).emit('room:members', {
-      roomId: room.id,
-      members,
+    socket.on('room:approve', async ({ roomId, targetSocketId }) => {
+      const room = activeRooms.get(roomId);
+      if (!room || room.metadata.created_by !== userId) return;
+      
+      const targetUserId = room.pending.get(targetSocketId);
+      if (targetUserId) {
+        room.pending.delete(targetSocketId);
+        room.users.set(targetSocketId, targetUserId);
+        
+        // 🌟 PERMANENT APPROVAL: Update DB and Memory
+        room.approvedUserIds.add(targetUserId);
+        const { data: currentRoom } = await supabase.from('rooms').select('approved_ids').eq('id', roomId).single();
+        const updatedIds = Array.from(new Set([...(currentRoom?.approved_ids || []), targetUserId]));
+        
+        await supabase.from('rooms').update({ approved_ids: updatedIds }).eq('id', roomId);
+        
+        io.to(targetSocketId).emit('room:approved', { 
+          roomId, 
+          code: room.metadata.join_code,
+          room: room.metadata // 🌟 Send metadata so it appears in sidebar
+        });
+        io.to(targetSocketId).emit('room:history', { messages: room.messages, metadata: room.metadata });
+        io.to(roomId).emit('room:members', await getRoomMembers(roomId));
+      }
     });
 
-    // System message
-    const joinMessage = {
-      id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      roomId: code,
-      userId: 'system',
-      username: 'System',
-      avatar: 'system',
-      content: `${userRecord.user.username} joined the room.`,
-      timestamp: new Date().toISOString(),
-      isSystem: true,
-    };
-    io.to(code).emit('message:new', {
-      roomId: code,
-      message: joinMessage,
+    socket.on('room:reject', async ({ roomId, targetSocketId }) => {
+      const room = activeRooms.get(roomId);
+      if (!room || room.metadata.created_by !== userId) return;
+      
+      room.pending.delete(targetSocketId);
+      io.to(targetSocketId).emit('room:rejected', { roomId });
+      io.to(roomId).emit('room:members', await getRoomMembers(roomId));
     });
-  });
 
-  socket.on('message:send', (payload) => {
-    const { roomId, content, image } = payload || {};
-    const userId = socket.data.userId;
-    if (!userId || !roomId || (!content?.trim() && !image)) return;
+    socket.on('message:send', async ({ roomId, content, image }) => {
+      let room = activeRooms.get(roomId);
+      
+      // Hyper-Healing: Re-initialize global rooms instantly
+      if (!room && ['general', 'tech-talk', 'ai-lounge'].includes(roomId)) {
+        room = { 
+          users: new Map(), 
+          messages: [], 
+          metadata: { id: roomId, name: roomId, is_private: false },
+          pending: new Map(),
+          approvedUserIds: new Set()
+        };
+        activeRooms.set(roomId, room);
+      }
 
-    const userRecord = usersById.get(userId);
-    if (!userRecord) return;
+      // Sync Check: Ensure user is in the room
+      if (room && !room.users.has(socket.id) && !['general', 'tech-talk', 'ai-lounge'].includes(roomId)) {
+        return;
+      }
 
-    const message = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      roomId,
-      userId: userRecord.user.id,
-      username: userRecord.user.username,
-      avatar: userRecord.user.avatar,
-      content: content?.trim() || '',
-      image,
-      timestamp: new Date().toISOString(),
-    };
+      if (!room || !room.users.has(socket.id)) return;
 
-    io.to(roomId).emit('message:new', {
-      roomId,
-      message,
-    });
-  });
-
-  socket.on('typing:start', (payload) => {
-    const { roomId } = payload || {};
-    const userId = socket.data.userId;
-    if (!userId || !roomId) return;
-
-    socket.to(roomId).emit('typing:start', { roomId, userId });
-  });
-
-  socket.on('typing:stop', (payload) => {
-    const { roomId } = payload || {};
-    const userId = socket.data.userId;
-    if (!userId || !roomId) return;
-
-    socket.to(roomId).emit('typing:stop', { roomId, userId });
-  });
-
-  socket.on('disconnect', () => {
-    const userId = socket.data.userId;
-    if (!userId) {
-      console.log(`Client disconnected (no user): ${socket.id}`);
-      return;
-    }
-
-    const record = usersById.get(userId);
-    if (!record) return;
-
-    // Mark user offline
-    record.user.status = 'offline';
-    record.user.activeRoom = null;
-
-    // Do NOT delete from usersById or room.members, so they show as offline
-    // We just broadcast the offline status
-
-    for (const roomId of record.rooms) {
-      const room = rooms.get(roomId);
-      if (!room) continue;
-
-      const members = getRoomMembers(roomId);
-      io.to(roomId).emit('room:members', {
-        roomId,
-        members,
-      });
-
-      // Emit leave message
-      const leaveMessage = {
-        id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        roomId,
-        userId: 'system',
-        username: 'System',
-        avatar: 'system',
-        content: `${record.user.username} left the room.`,
-        timestamp: new Date().toISOString(),
-        isSystem: true,
+      const message = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        roomId, // 🌟 Tag with roomId for isolation
+        userId, 
+        username: profile.username, 
+        avatar: profile.avatar,
+        content, 
+        timestamp: new Date().toISOString()
       };
 
-      io.to(roomId).emit('message:new', {
-        roomId,
-        message: leaveMessage,
+      room.messages.push(message);
+      
+      if (room.messages.length > 100) room.messages.shift();
+      io.to(roomId).emit('message:new', message);
+    });
+
+    socket.on('room:create', async ({ name, isPrivate, code }) => {
+      console.log(`[Socket] Room create requested: ${name} (private: ${isPrivate})`);
+      try {
+        const codeHash = isPrivate && code ? await bcrypt.hash(code, 10) : null;
+        
+        let { data: dbRoom, error } = await userSupabase
+          .from('rooms')
+          .insert({
+            name,
+            is_private: isPrivate,
+            code_hash: codeHash,
+            join_code: code,
+            created_by: userId
+          })
+          .select()
+          .single();
+
+        if (error && error.message.includes('join_code')) {
+          const result = await userSupabase.from('rooms').insert({
+            name, is_private: isPrivate, code_hash: codeHash, created_by: userId
+          }).select().single();
+          dbRoom = result.data;
+          error = result.error;
+        }
+
+        if (error) throw error;
+        
+        // 🛡️ STEALTH SYNC: Only show to the creator. Others see it only after approval.
+        socket.emit('room:force_add', { room: dbRoom });
+        socket.emit('room:created', dbRoom);
+      } catch (err) {
+        console.error('[Socket] Create Error:', err.message);
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    socket.on('room:kick', async ({ roomId, targetUserId }) => {
+      const room = activeRooms.get(roomId);
+      if (!room || room.metadata.created_by !== userId) return;
+      
+      // Revoke lifetime approval
+      room.approvedUserIds.delete(targetUserId);
+
+      room.users.forEach((uId, sId) => {
+        if (uId === targetUserId) {
+          io.sockets.sockets.get(sId)?.leave(roomId);
+          io.to(sId).emit('room:kicked', { roomId });
+          room.users.delete(sId);
+        }
       });
-    }
+      io.to(roomId).emit('room:members', await getRoomMembers(roomId));
+    });
 
-    console.log(`Client disconnected: ${socket.id} (user: ${userId})`);
+    socket.on('room:delete', async ({ roomId }) => {
+      const room = activeRooms.get(roomId);
+      if (!room || room.metadata.created_by !== userId) return;
+      const { error } = await userSupabase.from('rooms').delete().eq('id', roomId);
+      if (error) return socket.emit('error', { message: 'Failed to delete room' });
+      
+      // ⚡ EXPLICIT SYNC: Tell all sidebars to delete this specific room ID
+      io.emit('room:force_remove', { roomId });
+      io.to(roomId).emit('room:deleted', { roomId });
+      activeRooms.delete(roomId);
+    });
 
-    // Check if everyone is offline to clean up session
-    let allOffline = true;
-    for (const userRecord of usersById.values()) {
-      if (userRecord.user.status !== 'offline') {
-        allOffline = false;
-        break;
+    socket.on('disconnect', async () => {
+      console.log(`[Socket] 🔴 Disconnected: ${socket.id} (User: ${userId})`);
+      socketToUser.delete(socket.id);
+      
+      // Update member lists for all rooms this user was in
+      for (const [roomId, room] of activeRooms.entries()) {
+        if (room.users.has(socket.id)) {
+          room.users.delete(socket.id);
+          const members = await getRoomMembers(roomId);
+          io.to(roomId).emit('room:members', members);
+        }
       }
-    }
 
-    if (usersById.size > 0 && allOffline) {
-      console.log('All users are offline. Closing session and cleaning up memory...');
-      usersById.clear();
-      rooms.clear();
-      // Re-initialize default rooms
-      for (const room of defaultRooms) {
-        room.members.clear(); // Ensure default room members are cleared out
-        rooms.set(room.id, room);
+      // 🛡️ GLOBAL EVAPORATION: Only clear if the ENTIRE server is empty
+      if (socketToUser.size === 0) {
+        console.log('[Socket] ⚠️ Server is empty. Global Evaporation initiated (60s)...');
+        const globalTimer = setTimeout(() => {
+          if (socketToUser.size === 0) {
+            activeRooms.forEach((room, roomId) => {
+              const isGlobal = ['general', 'tech-talk', 'ai-lounge'].includes(String(roomId).toLowerCase());
+              if (!isGlobal) activeRooms.delete(roomId);
+            });
+            console.log('[Socket] 💨 Global Evaporation complete. All non-global rooms cleared.');
+          }
+        }, 60000); // 60 seconds of grace period
+        global._evaporationTimer = globalTimer;
       }
-      console.log('Session wiped and defaults restored.');
+    });
+
+    // Cancel evaporation if anyone joins
+    if (global._evaporationTimer && socketToUser.size > 0) {
+      clearTimeout(global._evaporationTimer);
+      global._evaporationTimer = null;
+      console.log('[Socket] ✨ Global Evaporation cancelled. Users detected.');
     }
   });
-});
+
 
   httpServer.listen(PORT, (err) => {
     if (err) throw err;

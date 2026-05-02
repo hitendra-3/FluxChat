@@ -1,108 +1,97 @@
-# FluxChat – Real-Time Message Flow
+# 🏛️ FluxChat Enterprise: Stealth-First Communication Protocol
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js" alt="Next.js" />
-  <img src="https://img.shields.io/badge/Socket.io-4.x-blue?style=for-the-badge&logo=socket.io" alt="Socket.io" />
-  <img src="https://img.shields.io/badge/Tailwind_CSS-3.x-38B2AC?style=for-the-badge&logo=tailwind-css" alt="Tailwind CSS" />
-  <img src="https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=node.js" alt="Node.js" />
-</p>
+> "In the noise of modern communication, FluxChat is the signal of absolute clarity."
 
-**FluxChat** is a high-performance, real-time web application designed for seamless, fluid communication. The name represents the "flow" and transience of messaging—where conversations move quickly, naturally, and disappear when no longer needed.
+FluxChat is a premium, high-performance communication platform engineered for professionals. Built with an **Executive-Minimalist** philosophy, it strips away feature-bloat to deliver lightning-fast text signals, lifetime persistence, and a highly refined "Prism-Light" responsive aesthetic.
 
 ---
 
-## Why FluxChat?
+## ⚡ Enterprise System Architecture
 
-In a world of permanent logs, **FluxChat** offers a breath of fresh air. Built for **privacy and speed**, it operates without a persistent database. 
+FluxChat operates on a unique hybrid architecture that prioritizes speed, absolute isolation, and zero-loss persistence.
 
-- **🔏 Database-Free**: Your conversations live only in memory. Once the room is empty, all messages evaporate.
-- **⚡ Real-Time Flux**: Built on WebSockets for instantaneous, low-latency messaging.
-- **🎨 Premium UI**: A modern, iOS-inspired aesthetic with smooth animations and a responsive mobile layout.
+### 1. The "Global Pulse" Evaporation Engine
+Traditional chat apps rely on heavy databases to store messages. FluxChat is a **Live-Memory Ecosystem**. 
+- The server utilizes an advanced `_evaporationTimer`. 
+- Message history is stored entirely in high-speed server RAM.
+- **The Global Pulse**: As long as a *single user* is online anywhere in the entire platform, all sector histories remain locked and active. The server only triggers a 60-second evaporation sequence if the entire platform population drops to zero.
 
----
+### 2. Zero-Leak Signal Isolation
+- **Strict ID Normalization**: All room identifiers are forcefully normalized as `String` types across both server and client. This prevents "ghost channels" and ensures 100% stable history loading during rapid channel shifting.
+- **Decoupled Routing**: Advanced Socket.io room management ensures that private sector data never bleeds into global lounges or unauthorized clients.
 
-## Key Features
-
-- **🖼️ Advanced Photo Sharing**: Send high-quality images with a professional WhatsApp-style flow.
-  - **Live Preview**: See your image before sending.
-  - **Captions**: Add a message or caption directly to your photos.
-  - **Manual Send**: Full control over when your media is shared.
-- **✨ Professional Image Viewer**: A high-end modal for viewing shared photos.
-  - **Glassmorphism Backdrop**: Beautifully blurred background for focused viewing.
-  - **Snap-Fast Animations**: Optimized transitions for an "instant" feel.
-  - **Easy Controls**: One-click download and multiple ways to close (Click outside, 'X' button, or 'Esc').
-- **🛡️ Auto-Evaporate Security**: All custom room data and messages are wiped clean as soon as the last user leaves. No history, no logs, total privacy.
-- **👤 Persistent Avatars**: Select from a curated set of 2 male and 2 female avatars that follow you throughout your session.
-- **🌍 Tech Lounges**: Dive into 6 permanent professional rooms: `#cse`, `#tech`, `#coding`, `#ai`, `#webdev`, and `#placements`.
-- **🔑 Private Channels**: Create encrypted-by-nature private rooms locked with unique 4-digit codes.
-- **💎 Premium Design**: Custom professional blue scrollbar, sleekrounded containers, and perfectly aligned UI elements for a top-tier user experience.
+### 3. Prism-Light UI & Mobile Intelligence
+We believe professional tools should look exceptional on all devices. FluxChat utilizes a custom **"Prism-Light"** responsive design system:
+- **Responsive Architecture**: Engineered with a mobile-first philosophy. Sidebars seamlessly transform into off-canvas drawers on smaller screens, while input fields dynamically adjust to prevent mobile-browser zooming.
+- **Pearl-Glass UI**: Deep backdrop blurs, 1px precision borders, and soft elevation shadows powered by Tailwind CSS.
+- **Executive Typography**: High-contrast slate text with mathematical spacing (`Inter`/system fonts) for maximum readability in high-stress environments.
 
 ---
 
-## Tech Stack
+## 🛡️ Secure Sectors & Access Control
 
-- **Frontend**: [Next.js](https://nextjs.org/) (React) + [Tailwind CSS](https://tailwindcss.com/)
-- **Backend**: [Node.js](https://nodejs.org/) + Express
-- **Real-Time**: [Socket.IO](https://socket.io/)
-- **Avatars**: [DiceBear Avataaars](https://api.dicebear.com/)
-- **Icons**: [Lucide React](https://lucide.dev/)
+### Private Sectors
+Secure, invitation-only communication vaults designed for focused teams.
+- **LIFETIME PERSISTENCE**: Once an administrator grants access, your clearance is locked into the Supabase PostgreSQL database. No re-requests. No friction.
+- **PRECISION PRESENCE**: Real-time status intelligence tracks exactly who is active within a sector and who has shifted focus.
 
----
+### Zero-Reset Security Protocol
+Our security philosophy is simple: True privacy requires absolute responsibility. We do not store recovery keys, and we do not suffer administrative bloat.
 
-## How It Works (The "Flux" Logic)
-
-```mermaid
-graph TD
-    A[User Joins] --> B{Choose Avatar}
-    B --> C[Enter Public or Private Room]
-    C --> D[Real-time Flux Connection]
-    D --> E[Messages Flow in Memory]
-    E --> F{All Users Exit?}
-    F -- Yes --> G[Session Data Evaporates]
-    F -- No --> E
-```
+> [!CAUTION]  
+> **"Tattoo your password on your soul, because we don't believe in 'Reset' buttons. In FluxChat, you either remember the key, or you lose the vault forever. There is no middle ground."** 😎🔒
 
 ---
 
-## Getting Started (Local Development)
+## 🛠️ Technical Stack Matrix
 
-### 1. Prerequisites
-Make sure you have [Node.js](https://nodejs.org/) and `npm` installed.
+| Layer | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Framework** | Next.js 14+ (Turbopack) | High-speed React hydration and App Router architecture |
+| **Signal Engine** | Socket.io | Real-time bi-directional event-based communication |
+| **Auth & DB** | Supabase (PostgreSQL) | JWT Security, User Profiles, and Sector Access Control |
+| **Aesthetics** | Tailwind CSS | Executive-Grade "Prism-Light" Responsive Styling |
+| **Icons** | Lucide React | Minimalist, professional UI iconography |
 
-### 2. Installation
+---
+
+## 🚀 Deployment & Ignition
+
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/hitendra-3/FluxChat.git
-cd FluxChat
+```
+
+### 2. Synchronize Dependencies
+```bash
 npm install
 ```
 
-### 3. Running Locally
-FluxChat requires two processes to run at once. Open two terminal windows:
+### 3. Initialize Environment
+Create a `.env` file in the root directory with your secure Supabase credentials:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_database_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_secure_anon_key
+```
 
-**Terminal 1 (Socket Backend):**
+### 4. Ignite the Systems
+To run the platform locally, you must ignite both the frontend interface and the persistence engine.
 ```bash
+# Terminal 1: Next.js Frontend Interface
+npm run dev
+
+# Terminal 2: Socket.io Persistence Server
 node server.js
 ```
 
-**Terminal 2 (Frontend Interface):**
-```bash
-npm run dev
-```
-
-Open your browser at `http://localhost:3000` and start the flow!
-
 ---
 
-## Deployment
+## 🤝 Architecture & Engineering
 
-Since FluxChat uses long-lived WebSockets, it performs best on platforms with persistent process support.
-
-- **Recommended**: Railway.app (Backend) and Render.com (Frontend).
-- **Scaling**: For high traffic, you can deploy the `server.js` and the Next.js frontend as separate, linked services.
-- **Config**: Ensure `NODE_ENV` is set to `production` and provide a `PORT` environment variable for the socket server.
+**Designed, Engineered, and Maintained exclusively by:**
+- **Hitendra S**
 
 ---
-
 <p align="center">
-  Built with ❤️ for real-time enthusiasts.
+  <i>FluxChat v2 — Built for speed. Designed for professionals.</i>
 </p>

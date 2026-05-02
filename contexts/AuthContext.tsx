@@ -1,6 +1,8 @@
 'use client';
 
-import React, { createContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useReducer, ReactNode, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 export interface User {
   id: string;
@@ -11,43 +13,44 @@ export interface User {
 
 export interface AuthContextType {
   user: User | null;
+  session: Session | null;
   isAuthenticated: boolean;
-  login: (user: User) => void;
-  logout: () => void;
-  updateUser: (user: Partial<User>) => void;
+  isLoading: boolean;
+  logout: () => Promise<void>;
 }
 
 type AuthAction =
-  | { type: 'LOGIN'; payload: User }
-  | { type: 'LOGOUT' }
-  | { type: 'UPDATE_USER'; payload: Partial<User> };
+  | { type: 'SET_SESSION'; payload: { session: Session | null; user: User | null } }
+  | { type: 'SET_LOADING'; payload: boolean };
 
 interface AuthState {
   user: User | null;
+  session: Session | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const initialState: AuthState = {
   user: null,
+  session: null,
   isAuthenticated: false,
+  isLoading: true,
 };
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
-    case 'LOGIN':
-      return {
-        user: action.payload,
-        isAuthenticated: true,
-      };
-    case 'LOGOUT':
-      return {
-        user: null,
-        isAuthenticated: false,
-      };
-    case 'UPDATE_USER':
+    case 'SET_SESSION':
       return {
         ...state,
-        user: state.user ? { ...state.user, ...action.payload } : null,
+        session: action.payload.session,
+        user: action.payload.user,
+        isAuthenticated: !!action.payload.session,
+        isLoading: false,
+      };
+    case 'SET_LOADING':
+      return {
+        ...state,
+        isLoading: action.payload,
       };
     default:
       return state;
@@ -59,24 +62,75 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  const login = (user: User) => {
-    dispatch({ type: 'LOGIN', payload: user });
-  };
+  useEffect(() => {
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        fetchProfile(session);
+      } else {
+        dispatch({ type: 'SET_SESSION', payload: { session: null, user: null } });
+      }
+    });
 
-  const logout = () => {
-    dispatch({ type: 'LOGOUT' });
-  };
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchProfile(session);
+      } else {
+        dispatch({ type: 'SET_SESSION', payload: { session: null, user: null } });
+      }
+    });
 
-  const updateUser = (userUpdate: Partial<User>) => {
-    dispatch({ type: 'UPDATE_USER', payload: userUpdate });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function fetchProfile(session: Session) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profile) {
+      dispatch({
+        type: 'SET_SESSION',
+        payload: {
+          session,
+          user: {
+            id: session.user.id,
+            username: profile.username,
+            avatar: profile.avatar,
+            status: 'online',
+          },
+        },
+      });
+    } else {
+        // Fallback or wait for profile creation
+        dispatch({
+            type: 'SET_SESSION',
+            payload: {
+              session,
+              user: {
+                id: session.user.id,
+                username: session.user.user_metadata.username || 'Anonymous',
+                avatar: session.user.user_metadata.avatar || session.user.id,
+                status: 'online',
+              },
+            },
+          });
+    }
+  }
+
+  const logout = async () => {
+    await supabase.auth.signOut();
   };
 
   const value: AuthContextType = {
     user: state.user,
+    session: state.session,
     isAuthenticated: state.isAuthenticated,
-    login,
+    isLoading: state.isLoading,
     logout,
-    updateUser,
   };
 
   return (

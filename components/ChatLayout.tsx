@@ -14,11 +14,11 @@ export function ChatLayout({
   chatWindow,
   rightSidebar,
 }: ChatLayoutProps) {
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
+  const [leftOpen, setLeftOpen] = useState(false);
+  const [rightOpen, setRightOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-[100dvh] bg-background overflow-hidden">
       {/* Left Sidebar */}
       <div className="hidden md:flex md:w-64 flex-col border-r border-border bg-sidebar overflow-hidden">
         {leftSidebar}

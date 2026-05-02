@@ -2,89 +2,51 @@
 
 import React from 'react';
 import { Message } from '@/contexts/ChatContext';
-import { Avatar } from './ui/Avatar';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { ImageModal } from './ui/ImageModal';
-import { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface MessageBubbleProps {
   message: Message;
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  if (message.isSystem) {
-    return (
-      <div className="flex justify-center my-2">
-        <span className="px-3 py-1 bg-muted text-muted-foreground text-xs rounded-full inline-block text-center">
-          {message.content}
-        </span>
-      </div>
-    );
-  }
-
-  const isOwnMessage = message.isOwn;
+  const { user } = useAuth();
+  const isOwn = message.userId === user?.id;
+  const isLocal = message.id.startsWith('local-');
 
   return (
-    <div
-      className={cn(
-        'flex gap-3',
-        isOwnMessage && 'flex-row-reverse'
-      )}
-    >
-      {/* Avatar */}
-      <div className="flex-shrink-0">
-        <Avatar userId={message.userId} username={message.username} avatar={message.avatar} size="sm" />
-      </div>
-
-      {/* Message Content */}
-      <div className={cn(
-        'flex flex-col gap-1 max-w-xs lg:max-w-md',
-        isOwnMessage && 'items-end'
-      )}>
-        {/* Username and Timestamp */}
-        <div className={cn(
-          'flex items-center gap-2 text-[11px] text-muted-foreground px-1 mb-0.5',
-          isOwnMessage && 'flex-row-reverse'
-        )}>
-          <span className="font-medium text-xs">{message.username}</span>
-          <span>{format(message.timestamp, 'HH:mm')}</span>
-        </div>
-
-        {/* Message Bubble */}
-        <div
-          className={cn(
-            'px-4 py-2.5 rounded-2xl max-w-full shadow-sm text-[15px]',
-            isOwnMessage
-              ? 'bg-primary text-primary-foreground rounded-br-[4px]'
-              : 'bg-muted/80 text-foreground rounded-bl-[4px]'
+    <div className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-150 ${isLocal ? 'opacity-60 grayscale-[0.5]' : ''}`}>
+      <div className={`flex gap-3 max-w-[90%] md:max-w-[80%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+        {!isOwn && (
+          <img 
+            src={message.avatar?.startsWith('http') ? message.avatar : `https://api.dicebear.com/7.x/avataaars/svg?seed=${message.avatar || message.username}`} 
+            className="w-9 h-9 rounded-full bg-muted self-end mb-1 border border-border/40"
+            alt="avatar"
+          />
+        )}
+        
+        <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+          {!isOwn && (
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1 mb-1.5">
+              {message.username}
+            </span>
           )}
-        >
-          {message.image && (
-            <div className="mb-2 overflow-hidden rounded-lg">
-              <img
-                src={message.image}
-                alt="Shared content"
-                className="max-w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                onClick={() => setIsModalOpen(true)}
-              />
-            </div>
-          )}
-          {message.content && (
-            <p className="text-sm leading-relaxed break-words">{message.content}</p>
-          )}
+          
+          <div className={`
+            px-5 py-3.5 rounded-2xl text-[13px] leading-relaxed shadow-sm border transition-all duration-150
+            ${isOwn 
+              ? 'bg-primary text-white border-primary/20 rounded-br-none shadow-primary/10' 
+              : 'bg-muted/40 text-foreground border-border/40 rounded-bl-none backdrop-blur-md'}
+            ${isLocal ? 'border-primary/40 border-dashed' : ''}
+          `}>
+            {message.content && <p className="font-medium whitespace-pre-wrap">{message.content}</p>}
+          </div>
+          
+          <span className="text-[9px] font-bold text-muted-foreground/40 mt-1.5 px-1 uppercase tracking-widest">
+            {format(new Date(message.timestamp), 'HH:mm')}
+          </span>
         </div>
       </div>
-
-      {message.image && (
-        <ImageModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          imageUrl={message.image}
-        />
-      )}
     </div>
   );
 }
