@@ -10,6 +10,28 @@ FluxChat is a premium, high-performance communication platform engineered for pr
 
 FluxChat operates on a unique hybrid architecture that prioritizes speed, absolute isolation, and zero-loss persistence.
 
+```mermaid
+graph TD
+    %% Styling
+    classDef client fill:#fcfcfc,stroke:#e5e7eb,stroke-width:2px,color:#1a1a1a
+    classDef engine fill:#111827,stroke:#374151,stroke-width:2px,color:#ffffff
+    classDef db fill:#059669,stroke:#047857,stroke-width:2px,color:#ffffff
+    
+    %% Nodes
+    A[Client / Browser<br>Next.js UI]:::client
+    B{Socket.io Engine<br>Signal Router}:::engine
+    C[(Supabase PostgreSQL<br>Auth & Access Control)]:::db
+    D[Active Memory Map<br>Sector Data]:::engine
+    E[Global Pulse Monitor<br>Evaporation Timer]:::engine
+
+    %% Connections
+    A <-->|WebSocket Signals| B
+    B -->|Verify JWT & Approval| C
+    B <-->|Read/Write Messages| D
+    D -.->|Guarded By| E
+    E -.->|Purge if 0 Users| D
+```
+
 ### 1. The "Global Pulse" Evaporation Engine
 Traditional chat apps rely on heavy databases to store messages. FluxChat is a **Live-Memory Ecosystem**. 
 - The server utilizes an advanced `_evaporationTimer`. 
